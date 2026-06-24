@@ -116,9 +116,12 @@ skill) so only real sessions are funded, plus an IP rate-limit and a DB-backed
 `claimed` table. The on-chain `claimed[]` in option B stops double-funding even
 if the API is abused.
 
-**To run it:** set `DISTRIBUTOR_PRIVATE_KEY` (an account holding the 1M + a little
-ETH for gas) — or deploy `UsdmDripper.sol`, fund it with the 1M, and point the
-route at it. Then every connect auto-funds.
+**To run it:** the `UsdmDripper` contract is deployed at
+`0x176E9A0B7a7911d49F70eB42d76b29157cd6cBc2`. `/api/drip` calls its `drip(user)`
+as the **operator**, so set `OPERATOR_PRIVATE_KEY` (the dripper operator key —
+the deployer by default; needs a little ETH for gas) and optionally
+`DRIPPER_ADDRESS` to override. Fund the contract with the 1M USDm, then every
+connect auto-funds 1000 USDm, once per wallet (on-chain `claimed[]`).
 
 ---
 
