@@ -1,16 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-// Recommended distributor for the 1M test-USDm onboarding reserve.
+// Distributor for the 1M test-USDm onboarding reserve.
 //
-// Why a contract instead of a hot account:
-//  - on-chain claimed[] dedupe (the API can't be replayed to double-fund)
-//  - batchable drip([...]) — cheap on MegaETH, one tx funds many users
-//  - the 1M sits in a contract with a fixed per-address cap, not a raw key
+// Deploy notes (Remix):
+//   - In the Deploy panel, set the CONTRACT dropdown to "UsdmDripper" (NOT
+//     "IERC20" — that's the interface below and can't be deployed; selecting it
+//     is what triggers the "contract may be abstract" error).
+//   - No constructor arguments: the official mock USDm address and the 1000-USDm
+//     drip amount are baked in. Just press Deploy.
 //
-// Fund it: transfer the 1M USDm to this contract's address after deploy.
-// Drive it: the Kalma backend (operator) calls drip()/dripBatch() right after a
-// new wallet connects. Keep an allowlisted operator; rotate via setOperator.
+// After deploy:
+//   1. Transfer the 1M USDm to this contract's address (it must hold the funds).
+//   2. The reserve drips 1000 USDm per wallet, once each (on-chain claimed[]).
+//   3. Point your /api/drip backend at drip()/dripBatch(), or call them directly.
+//
+// Why a contract instead of a hot account: on-chain claimed[] dedupe (can't be
+// replayed to double-fund), batchable dripBatch([...]), and the 1M sits behind a
+// fixed per-address cap rather than a raw key.
 
 interface IERC20 {
     function transfer(address to, uint256 amount) external returns (bool);
@@ -18,10 +25,12 @@ interface IERC20 {
 }
 
 contract UsdmDripper {
-    IERC20 public immutable usdm;
+    // Official mock USDm on MegaETH testnet (the paymaster-supported test cash).
+    IERC20 public constant usdm = IERC20(0x72d4db19E3AE6f8ed47B5337ab00D69685277cF4);
+
     address public owner;
     address public operator;
-    uint256 public dripAmount;            // e.g. 200e18
+    uint256 public dripAmount = 1000e18; // 1000 USDm per wallet
     mapping(address => bool) public claimed;
 
     event Dripped(address indexed user, uint256 amount);
@@ -32,11 +41,9 @@ contract UsdmDripper {
     error AlreadyClaimed();
     error DripFailed();
 
-    constructor(address _usdm, address _operator, uint256 _dripAmount) {
-        usdm = IERC20(_usdm);
+    constructor() {
         owner = msg.sender;
-        operator = _operator;
-        dripAmount = _dripAmount;
+        operator = msg.sender; // change later with setOperator if the backend signs with a different key
     }
 
     modifier onlyOperator() {
@@ -44,7 +51,7 @@ contract UsdmDripper {
         _;
     }
 
-    /// @notice Fund one fresh wallet. Reverts if already funded.
+    /// @notice Fund one fresh wallet with `dripAmount`. Reverts if already funded.
     function drip(address user) public onlyOperator {
         if (claimed[user]) revert AlreadyClaimed();
         claimed[user] = true;
