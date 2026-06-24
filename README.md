@@ -102,13 +102,15 @@ No button. See the `useEffect` auto-drip in [`app/page.tsx`](app/page.tsx).
 | Batch | one tx/user | `dripBatch([...])` — one tx, many users |
 | Gas | EOA needs a little ETH | operator pays; cheap on MegaETH |
 
-**Sizing:** at 200 USDm/user the 1M funds **~5,000 users** (`DRIP_AMOUNT` env).
-Kalma's min seed is 10 USDm and min position 1 USDm, so 100–200 is plenty for a
-beta user to take several positions. Pick the amount against expected beta size.
+**Sizing:** at **1000 USDm/user the 1M funds ~1,000 users** (`DRIP_AMOUNT` env).
+Kalma's min seed is 10 USDm and min position 1 USDm, so 1000 lets a beta user
+take many positions. Pick the amount against expected beta size.
 
 **Abuse — important:** 1M is finite and `/api/drip` is public. The stub does
-per-address dedupe + skips already-funded wallets, but a script could still
-spray random addresses. Before beta, gate it with the **MOSS auth JWT**
+**one drip per address** and **one drip per IP** (the IP is blocked after its
+first successful drop) + skips already-funded wallets — but a determined script
+behind many IPs could still spray addresses. Before beta, also gate it with the
+**MOSS auth JWT**
 (`mega.authenticate()` → verify server-side via the `moss-wallet-server-verify`
 skill) so only real sessions are funded, plus an IP rate-limit and a DB-backed
 `claimed` table. The on-chain `claimed[]` in option B stops double-funding even

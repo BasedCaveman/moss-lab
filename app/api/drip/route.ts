@@ -17,12 +17,21 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { megaethTestnet } from '@/lib/chain';
 import { USDM_ADDRESS, erc20Abi } from '@/lib/usdm';
 
-const DRIP_AMOUNT = parseUnits(process.env.DRIP_AMOUNT || '200', 18); // 200 USDm → 1M funds ~5,000 users
-const dripped = new Set<string>(); // lab-only dedupe; use a DB in production
+const DRIP_AMOUNT = parseUnits(process.env.DRIP_AMOUNT || '1000', 18); // 1000 USDm → 1M funds ~1,000 users
+const dripped = new Set<string>();    // lab-only per-address dedupe; use a DB in production
+const blockedIps = new Set<string>(); // one drip per IP — blocked after its first successful drop
+
+function clientIp(req: NextRequest): string {
+  // Prefer x-real-ip (Vercel-set, harder to spoof) then first x-forwarded-for hop.
+  return (req.headers.get('x-real-ip') || req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown').trim();
+}
 
 export async function POST(req: NextRequest) {
   const key = process.env.DISTRIBUTOR_PRIVATE_KEY as `0x${string}` | undefined;
   if (!key) return NextResponse.json({ error: 'DISTRIBUTOR_NOT_CONFIGURED' }, { status: 501 });
+
+  const ip = clientIp(req);
+  if (blockedIps.has(ip)) return NextResponse.json({ error: 'IP_ALREADY_DRIPPED' }, { status: 429 });
 
   let to: string;
   try {
@@ -47,6 +56,7 @@ export async function POST(req: NextRequest) {
   try {
     const hash = await wallet.writeContract({ address: USDM_ADDRESS, abi: erc20Abi, functionName: 'transfer', args: [to, DRIP_AMOUNT] });
     dripped.add(to);
+    blockedIps.add(ip); // one drip per IP: block this IP from any further drops
     return NextResponse.json({ ok: true, status: 'dripped', hash });
   } catch (e: any) {
     return NextResponse.json({ error: 'DRIP_FAILED', detail: e?.shortMessage ?? String(e) }, { status: 500 });
