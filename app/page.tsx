@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   useStatus,
   useConnect,
@@ -58,6 +58,23 @@ export default function Lab() {
   }
 
   const connected = status === 'connected';
+
+  // Auto-drip: the moment a wallet connects, fund it server-side (no "deposit"
+  // click). Fires once per address. Because MOSS can pay gas in USDm, this one
+  // silent step fully onboards the user.
+  const dripped = useRef<string | null>(null);
+  useEffect(() => {
+    if (!connected || !address || dripped.current === address) return;
+    dripped.current = address;
+    add('auto-drip: requesting test USDm…');
+    fetch('/api/drip', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address }) })
+      .then((r) => r.json())
+      .then((d) => {
+        add(`auto-drip → ${d.status ?? d.error}${d.hash ? ` (${d.hash})` : ''}`);
+        refetchBalances();
+      })
+      .catch((e) => add(`auto-drip failed: ${e}`));
+  }, [connected, address]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <main style={{ maxWidth: 720, margin: '0 auto', padding: 24, display: 'grid', gap: 16 }}>

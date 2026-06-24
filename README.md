@@ -82,6 +82,44 @@ two SDKs for little gain.)
 
 ---
 
+## Auto-onboarding: dripping the 1M test USDm (no "deposit" click)
+
+The Moss team can send **1M of their official mock USDm**. The plan: park it in a
+distributor and push a small amount to each new wallet automatically, so the user
+never clicks "deposit." Because MOSS lets **gas be paid in USDm**, that single
+silent drip *also* covers gas — one step fully onboards the user.
+
+**Flow (wired in this lab):** wallet connects → the app silently POSTs the
+address to [`/api/drip`](app/api/drip/route.ts) → server sends ~200 USDm → done.
+No button. See the `useEffect` auto-drip in [`app/page.tsx`](app/page.tsx).
+
+**Two distributor options:**
+
+| | A) Account (stub, ready) | B) Contract (recommended) |
+| --- | --- | --- |
+| Holds the 1M | `DISTRIBUTOR_PRIVATE_KEY` EOA | [`UsdmDripper.sol`](contracts/UsdmDripper.sol) |
+| Dedupe | API/DB (`claimed` set) | **on-chain `claimed[]`** (can't be replayed) |
+| Batch | one tx/user | `dripBatch([...])` — one tx, many users |
+| Gas | EOA needs a little ETH | operator pays; cheap on MegaETH |
+
+**Sizing:** at 200 USDm/user the 1M funds **~5,000 users** (`DRIP_AMOUNT` env).
+Kalma's min seed is 10 USDm and min position 1 USDm, so 100–200 is plenty for a
+beta user to take several positions. Pick the amount against expected beta size.
+
+**Abuse — important:** 1M is finite and `/api/drip` is public. The stub does
+per-address dedupe + skips already-funded wallets, but a script could still
+spray random addresses. Before beta, gate it with the **MOSS auth JWT**
+(`mega.authenticate()` → verify server-side via the `moss-wallet-server-verify`
+skill) so only real sessions are funded, plus an IP rate-limit and a DB-backed
+`claimed` table. The on-chain `claimed[]` in option B stops double-funding even
+if the API is abused.
+
+**To run it:** set `DISTRIBUTOR_PRIVATE_KEY` (an account holding the 1M + a little
+ETH for gas) — or deploy `UsdmDripper.sol`, fund it with the 1M, and point the
+route at it. Then every connect auto-funds.
+
+---
+
 ## Verified vs needs-hands-on
 
 **Verified here:** packages real + installable; integration compiles + builds;
