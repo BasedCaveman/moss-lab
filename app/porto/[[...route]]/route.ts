@@ -3,17 +3,20 @@
 // with the merchant key so the APP pays gas. Result: the user never sees the
 // "Select gas token" picker or the "Set Max Gas Allowance" screen.
 //
-// Setup:
-//   1. Create a merchant account:  pnpx porto onboard --admin-key --testnet
-//   2. Fund it (ETH for gas, or USDm if sponsorToken=usdm).
-//   3. Env: MERCHANT_ADDRESS, MERCHANT_PRIVATE_KEY.
-//   4. Point MOSS at it: NEXT_PUBLIC_SPONSOR_URL = the ABSOLUTE url of
-//      /porto/merchant (the MOSS relay calls it server-side, so it can't be a
-//      relative path), e.g. https://moss-lab.vercel.app/porto/merchant
+// Env:
+//   MERCHANT_ADDRESS      — merchant account address (funded on MegaETH testnet)
+//   MERCHANT_PRIVATE_KEY  — its admin/private key (server-only; never NEXT_PUBLIC)
+//   MERCHANT_RELAY_URL    — OPTIONAL. Porto doesn't ship a MegaETH chain, so if
+//                           sponsorship is rejected, set this to MegaETH's
+//                           Porto-compatible relay URL (ask the Moss team). Left
+//                           unset, Route.merchant uses Porto's default relay and
+//                           MOSS's relay handles routing.
 import { Router, Route } from 'porto/server';
+import { http } from 'viem';
 
 const address = process.env.MERCHANT_ADDRESS as `0x${string}` | undefined;
 const key = process.env.MERCHANT_PRIVATE_KEY as `0x${string}` | undefined;
+const relayUrl = process.env.MERCHANT_RELAY_URL;
 
 const app =
   address && key
@@ -22,6 +25,7 @@ const app =
         Route.merchant({
           address,
           key,
+          ...(relayUrl ? { relay: http(relayUrl) } : {}),
           // sponsor(request) { return true } // narrow which calls to sponsor
         }),
       )
