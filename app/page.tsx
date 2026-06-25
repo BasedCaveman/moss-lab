@@ -40,6 +40,7 @@ export default function Lab() {
       },
     });
     add(`grantPermissions → ${res.status}`);
+    return res.status;
   }
 
   // Frictionless: no per-action wallet prompt once the grant is in place.
@@ -85,8 +86,14 @@ export default function Lab() {
     if (!connected || !address || granted.current === address) return;
     granted.current = address;
     grantSession()
-      .then(() => add('session granted → actions now silent'))
-      .catch((e) => add(`grant failed/declined: ${e}`));
+      .then((s) =>
+        add(
+          s === 'approved'
+            ? 'session granted → actions now silent'
+            : 'grant declined — actions will prompt until you approve a grant',
+        ),
+      )
+      .catch((e) => add(`grant failed: ${e}`));
   }, [connected, address]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
