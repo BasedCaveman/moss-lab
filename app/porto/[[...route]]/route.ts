@@ -1,16 +1,12 @@
-// Porto-compatible self-hosted paymaster (merchant) endpoint — LIVE on MegaETH
-// testnet. MOSS's `sponsorUrl` points here; Route.merchant() signs sponsorship
-// with the merchant key so the APP pays gas. Result: the user never sees the
-// "Select gas token" picker or the "Set Max Gas Allowance" screen.
+// Porto-compatible self-hosted paymaster (merchant) endpoint. MOSS's wallet
+// (account.megaeth.com) calls this from the BROWSER, so it needs CORS headers +
+// an OPTIONS preflight handler — Route.merchant doesn't add them. Without CORS
+// the wallet's fetch is blocked and grant/sponsor flows hang.
 //
 // Env:
 //   MERCHANT_ADDRESS      — merchant account address (funded on MegaETH testnet)
 //   MERCHANT_PRIVATE_KEY  — its admin/private key (server-only; never NEXT_PUBLIC)
-//   MERCHANT_RELAY_URL    — OPTIONAL. Porto doesn't ship a MegaETH chain, so if
-//                           sponsorship is rejected, set this to MegaETH's
-//                           Porto-compatible relay URL (ask the Moss team). Left
-//                           unset, Route.merchant uses Porto's default relay and
-//                           MOSS's relay handles routing.
+//   MERCHANT_RELAY_URL    — OPTIONAL MegaETH Porto relay override (ask Moss).
 import { Router, Route } from 'porto/server';
 import { http } from 'viem';
 
@@ -26,19 +22,34 @@ const app =
           address,
           key,
           ...(relayUrl ? { relay: http(relayUrl) } : {}),
-          // sponsor(request) { return true } // narrow which calls to sponsor
         }),
       )
     : null;
+
+// Allow the wallet host (and localhost devMode) to call the endpoint. `*` is
+// fine here — the merchant only signs sponsorship; no credentials are sent.
+const CORS: Record<string, string> = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Max-Age': '86400',
+};
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS });
+}
 
 async function handle(req: Request): Promise<Response> {
   if (!app) {
     return new Response(JSON.stringify({ error: 'MERCHANT_NOT_CONFIGURED' }), {
       status: 501,
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...CORS },
     });
   }
-  return app.fetch(req);
+  const res = await app.fetch(req);
+  const headers = new Headers(res.headers);
+  for (const [k, v] of Object.entries(CORS)) headers.set(k, v);
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
 
 export const GET = handle;
