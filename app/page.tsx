@@ -76,6 +76,19 @@ export default function Lab() {
       .catch((e) => add(`auto-drip failed: ${e}`));
   }, [connected, address]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-grant the session once at onboarding (one consent), so subsequent
+  // predict/claim/approve run silently — no per-action wallet prompt. With the
+  // paymaster (sponsorUrl) set, gas is sponsored too, so after this single
+  // consent the wallet never interrupts the user again.
+  const granted = useRef<string | null>(null);
+  useEffect(() => {
+    if (!connected || !address || granted.current === address) return;
+    granted.current = address;
+    grantSession()
+      .then(() => add('session granted → actions now silent'))
+      .catch((e) => add(`grant failed/declined: ${e}`));
+  }, [connected, address]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <main style={{ maxWidth: 720, margin: '0 auto', padding: 24, display: 'grid', gap: 16 }}>
       <h1 style={{ fontSize: 22 }}>MOSS Lab — wallet eval for Kalma</h1>

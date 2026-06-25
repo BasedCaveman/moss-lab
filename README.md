@@ -61,9 +61,9 @@ against the real SDK types. The integration surface is small and clean.
 - **Hosted wallet via iframe** (`account.megaeth.com`) — third-party dependency,
   and the account is **non-exportable** (MOSS Recovery Code; can't import into
   MetaMask). Lock-in to weigh.
-- **Full gas sponsorship needs a paymaster signer** (your own, or MegaETH's
-  managed service which the docs mark *"in progress"*). USDm-paid gas works now;
-  *sponsored* gas needs that endpoint.
+- **Gas sponsorship is LIVE on testnet** via the Porto-compatible self-hosted
+  paymaster (you run a merchant account + endpoint; MegaETH's *managed* paymaster
+  is the only thing still "in progress"). Wired here — see "Make gas automatic".
 - Young SDK (0.1.x) vs Privy's maturity.
 
 ### The social-verification question (X + Farcaster)
@@ -136,6 +136,31 @@ iframe flow, a live silent tx, a live USDm-gas tx, and the subjective
 "is this smoother than Privy?" judgment. Run `npm run dev` and click through —
 that's what this lab is for.
 
-To test **sponsored** gas (not just USDm-paid), get a `sponsorUrl` + paymaster
-signer from the Moss team, set `NEXT_PUBLIC_SPONSOR_URL` and `PAYMASTER_SIGNER_KEY`,
-and implement the signing in `app/api/sponsor/route.ts`.
+## Make gas automatic (no "Select gas token" / "Set Max Gas Allowance")
+
+Those wallet screens appear on the **default user-paid** path (no sponsor URL).
+The fix is the **Porto-compatible self-hosted paymaster** (live on testnet) — the
+app pays gas, so the user never sees gas UI. It's wired at
+[`app/porto/[[...route]]/route.ts`](app/porto/[[...route]]/route.ts):
+
+1. Create a merchant account: `pnpx porto onboard --admin-key --testnet`
+2. Fund it (ETH, or USDm if `NEXT_PUBLIC_SPONSOR_TOKEN=usdm`).
+3. Set env: `MERCHANT_ADDRESS`, `MERCHANT_PRIVATE_KEY`, and
+   `NEXT_PUBLIC_SPONSOR_URL` = the **absolute** url of `/porto/merchant`
+   (the MOSS relay calls it server-side — a relative path won't resolve).
+   Optionally `NEXT_PUBLIC_SPONSOR_MODE=everything` for a testing-only
+   "nothing ever asks for gas" demo.
+
+With that set: **gas is sponsored** (no gas screens) and the lab **auto-grants a
+session at connect** (one consent), so predict/claim/approve run **silently**.
+Net result after a single onboarding consent: the wallet never interrupts again.
+
+> The merchant may need a MegaETH-testnet relay/chain override on `Route.merchant`
+> — confirm the exact relay config with the Moss team if sponsorship is rejected.
+
+## Verified vs needs-hands-on (recap)
+
+**Verified here:** packages real; integration + Porto merchant endpoint compile
+and **build**; API usage matches the SDK types. **Needs you (real browser +
+passkey + funded merchant):** confirm the gas screens disappear once
+`NEXT_PUBLIC_SPONSOR_URL` is set, and the single-consent → silent flow.

@@ -1,16 +1,22 @@
 'use client';
 
-// Mounts the MOSS wallet once. Config mirrors mega.initialise():
+// Mounts the MOSS wallet once.
 // - network testnet (chainId 6343)
-// - sponsorToken 'usdm' so users can pay gas in USDm with no ETH (works even
-//   without a paymaster). This is the immediately-testable frictionless win.
-// - sponsorUrl + sponsorMode 'app-only' enable real gas SPONSORSHIP, but that
-//   needs a paymaster signing endpoint (your own paymaster or MegaETH's managed
-//   service). Set NEXT_PUBLIC_SPONSOR_URL once you have it; left unset, the lab
-//   still works with USDm-paid gas.
+// - GAS IS AUTOMATIC when sponsorUrl is set: the Porto-compatible self-hosted
+//   paymaster (/porto/merchant, LIVE on testnet) pays gas, so the user never
+//   sees the "Select gas token" / "Set Max Gas Allowance" screens. Set
+//   NEXT_PUBLIC_SPONSOR_URL to the ABSOLUTE /porto/merchant url + fund the
+//   merchant account (see app/porto/[[...route]]/route.ts).
+// - sponsorMode 'app-only' (default) sponsors app-initiated calls (predict /
+//   claim / approve); wallet-UI swaps/sends stay user-paid. Use 'everything'
+//   for a testing-only "nothing ever asks for gas" demo.
+// - Without sponsorUrl, gas is user-paid — payable in USDm with no ETH (the
+//   default token-gas path), but the wallet still shows a gas approval.
 import { MegaProvider } from '@megaeth-labs/wallet-sdk-react';
 
 const sponsorUrl = process.env.NEXT_PUBLIC_SPONSOR_URL || undefined;
+const sponsorMode = (process.env.NEXT_PUBLIC_SPONSOR_MODE as 'app-only' | 'explicit' | 'everything') || 'app-only';
+const sponsorToken = (process.env.NEXT_PUBLIC_SPONSOR_TOKEN as 'native' | 'usdm') || 'native';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -18,8 +24,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       config={{
         network: 'testnet',
         logging: 'info',
-        sponsorToken: 'usdm',
-        sponsorMode: 'app-only',
+        sponsorMode,
+        sponsorToken,
         ...(sponsorUrl ? { sponsorUrl } : {}),
       }}
     >
