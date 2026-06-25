@@ -1,7 +1,6 @@
 // Porto-compatible self-hosted paymaster (merchant) endpoint. MOSS's wallet
-// (account.megaeth.com) calls this from the BROWSER, so it needs CORS headers +
-// an OPTIONS preflight handler — Route.merchant doesn't add them. Without CORS
-// the wallet's fetch is blocked and grant/sponsor flows hang.
+// (account.megaeth.com) calls this cross-origin from the browser; CORS headers
+// (incl. the OPTIONS preflight) are added in next.config.js for /porto/:path*.
 //
 // Env:
 //   MERCHANT_ADDRESS      — merchant account address (funded on MegaETH testnet)
@@ -26,30 +25,14 @@ const app =
       )
     : null;
 
-// Allow the wallet host (and localhost devMode) to call the endpoint. `*` is
-// fine here — the merchant only signs sponsorship; no credentials are sent.
-const CORS: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Max-Age': '86400',
-};
-
-export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: CORS });
-}
-
 async function handle(req: Request): Promise<Response> {
   if (!app) {
     return new Response(JSON.stringify({ error: 'MERCHANT_NOT_CONFIGURED' }), {
       status: 501,
-      headers: { 'content-type': 'application/json', ...CORS },
+      headers: { 'content-type': 'application/json' },
     });
   }
-  const res = await app.fetch(req);
-  const headers = new Headers(res.headers);
-  for (const [k, v] of Object.entries(CORS)) headers.set(k, v);
-  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+  return app.fetch(req);
 }
 
 export const GET = handle;
