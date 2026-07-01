@@ -1,26 +1,29 @@
-// Porto-compatible self-hosted paymaster (merchant) endpoint. MOSS's wallet
-// (account.megaeth.com) calls this cross-origin from the browser; CORS headers
-// (incl. the OPTIONS preflight) are added in next.config.js for /porto/:path*.
+// MegaETH-native paymaster (merchant) endpoint. Uses @megaeth-labs/wallet-merchant
+// — MegaETH's own wrapper that targets the MegaETH relay/chain. This replaces
+// raw porto `Route.merchant`, which signed against Porto's default relay and made
+// the wallet throw `undefined.eoa` when reading the sponsorship response.
+//
+// The merchant() Hono app handles CORS itself (imports hono/cors), so we don't
+// add CORS in next.config anymore (that would duplicate the header).
 //
 // Env:
-//   MERCHANT_ADDRESS      — merchant account address (funded on MegaETH testnet)
-//   MERCHANT_PRIVATE_KEY  — its admin/private key (server-only; never NEXT_PUBLIC)
-//   MERCHANT_RELAY_URL    — OPTIONAL MegaETH Porto relay override (ask Moss).
-import { Router, Route } from 'porto/server';
-import { http } from 'viem';
+//   MERCHANT_ADDRESS      — the 7702-upgraded merchant account (intent.payer)
+//   MERCHANT_PRIVATE_KEY  — its root/authorized key (server-only)
+import { Hono } from 'hono';
+import { merchant } from '@megaeth-labs/wallet-merchant';
 
 const address = process.env.MERCHANT_ADDRESS as `0x${string}` | undefined;
 const key = process.env.MERCHANT_PRIVATE_KEY as `0x${string}` | undefined;
-const relayUrl = process.env.MERCHANT_RELAY_URL;
 
 const app =
   address && key
-    ? Router({ basePath: '/porto' }).route(
+    ? new Hono().basePath('/porto').route(
         '/merchant',
-        Route.merchant({
+        merchant({
           address,
           key,
-          ...(relayUrl ? { relay: http(relayUrl) } : {}),
+          // Sponsor everything for the eval. Tighten to a contract allowlist for prod.
+          sponsor: () => true,
         }),
       )
     : null;
@@ -37,3 +40,4 @@ async function handle(req: Request): Promise<Response> {
 
 export const GET = handle;
 export const POST = handle;
+export const OPTIONS = handle;
