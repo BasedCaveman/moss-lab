@@ -10,6 +10,7 @@ export async function GET() {
     merchant: {
       configured: !!(process.env.MERCHANT_ADDRESS && process.env.MERCHANT_PRIVATE_KEY),
       address: process.env.MERCHANT_ADDRESS ?? null,
+      keyType: process.env.MERCHANT_KEY_TYPE ?? 'secp256k1',
       relayOverride: !!process.env.MERCHANT_RELAY_URL,
     },
     dripper: {
